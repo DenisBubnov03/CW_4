@@ -2,47 +2,64 @@ import base64
 import hashlib
 import hmac
 
-from project.constants import PWD_HASH_SALT, PWD_HASH_ITERATIONS
-from project.dao.user import UserDAO
+from flask import current_app, abort
+
+from project.services.base_services import BaseServices
 
 
-class UserService:
-    def __init__(self, dao: UserDAO):
-        self.dao = dao
+class UserService(BaseServices):
+    def get_by_email(self, email):
+        """get user by email"""
+        user = self.dao.get_by_email(email)
+        if not user:
+            abort(404)
+        return user
 
-    def get_one(self, uid):
-        return self.dao.get_one(uid)
+    def create(self, data):
+        """create user"""
+        user = self.dao.get_by_email(data.get('email'))
+        if user:
+            abort(400)
 
-    def get_by_username(self, name):
-        return self.dao.get_by_username(name)
+        data['password'] = self.create_hash(data.get('password'))
+        return self.dao.create(data)
 
-    def get_all(self):
-        return self.dao.get_all()
+    def update_info(self, data, email):
+        """update user info (name, surname, favourite genre)"""
+        self.get_by_email(email)  # abort if user not found
 
-    def create(self, user_data):
-        user_data["password"] = self.get_password_hash(user_data.get("password"))
-        return self.dao.create(user_data)
+        if 'password' not in data.keys() and 'email' not in data.keys():
+            self.dao.update_email(data, email)
+        else:
+            abort(405)
 
-    def delete(self, uid):
-        return self.dao.delete(uid)
+    def update_password(self, data, email):
+        """update user password"""
+        user = self.get_by_email(email)
+        old_password = data.get('old_password')
+        new_password = data.get('new_password')
 
-    def update(self, user_data):
-        user_data["password"] = self.get_password_hash(user_data.get("password"))
-        return self.dao.update(user_data)
+        if None in [old_password, new_password] or not self.compare_passwords(user.password, old_password):
+            abort(404)
 
-    def get_password_hash(self, password):
+        self.dao.update_email(
+            {'password': self.create_hash(new_password)},
+            email
+        )
+
+    def create_hash(self, password):
+        """create password hash"""
         return base64.b64encode(hashlib.pbkdf2_hmac(
             'sha256',
-            password.encode('utf-8'),  # Convert the password to bytes
-            PWD_HASH_SALT,
-            PWD_HASH_ITERATIONS
+            password.encode('utf-8'),
+            current_app.config.get('PWD_HASH_SALT'),
+            current_app.config.get('PWD_HASH_ITERATIONS')
         ))
 
-    def compare_passwords(self, password_hash, other_password) -> bool:
-        decoded_digest = base64.b64decode(password_hash)
-        hash_digest = hashlib.pbkdf2_hmac('sha256',
-                                          other_password.encode('utf-8'),
-                                          PWD_HASH_SALT,
-                                          PWD_HASH_ITERATIONS)
-        print(decoded_digest, hash_digest)
-        return hmac.compare_digest(decoded_digest, hash_digest)
+    def compare_passwords(self, password_hash, other_password):
+        """compare passwords"""
+        return hmac.compare_digest(
+            base64.b64decode(password_hash),
+            hashlib.pbkdf2_hmac('sha256', other_password.encode(), current_app.config.get('PWD_HASH_SALT'),
+                                current_app.config.get('PWD_HASH_ITERATIONS'))
+        )

@@ -4,6 +4,7 @@ from project.dao.main import MovieDAO
 from project.dao.models.directors import Director
 from project.dao.models.genre import Genre
 from project.dao.models.movie import Movie
+from project.dao.models.user import User
 from project.dao.user import UserDAO
 
 from project.services import GenresService, DirectorsService, MoviesService
@@ -29,7 +30,7 @@ director_dao = DirectorDAO(db.session, status=None, model=Director)
 director_service = DirectorsService(dao=director_dao)
 
 # DAO
-user_dao = UserDAO(session=db.session)
+user_dao = UserDAO(db.session,model=User, status=None)
 
 # Service
 user_service = UserService(dao=user_dao)

@@ -1,36 +1,22 @@
+from project.dao.base import BaseDAO
 from project.dao.models.user import User
 
 
-class UserDAO:
-    def __init__(self, session):
-        self.session = session
+class UserDAO(BaseDAO):
 
-    def get_one(self, uid):
-        return self.session.query(User).get(uid)
-
-    def get_by_username(self, username):
-        return self.session.query(User).filter(User.username == username).first()
-
-    def get_all(self):
-        return self.session.query(User).all()
+    def get_by_email(self, email):
+        try:
+            email = self._db_session.query(User).filter(User.email == email).one()
+            return email
+        except:
+            return None
 
     def create(self, user_data):
         entity = User(**user_data)
-        self.session.add(entity)
-        self.session.commit()
+        self._db_session.add(entity)
+        self._db_session.commit()
         return entity
 
-    def delete(self, uid):
-        user = self.get_one(uid)
-        self.session.delete(user)
-        self.session.commit()
-
-    def update(self, user_data):
-        user = self.get_one(user_data.get("id"))
-
-        user.username = user_data.get("username")
-        user.password = user_data.get("password")
-        user.role = user_data.get("role")
-
-        self.session.add(user)
-        self.session.commit()
+    def update_email(self, data, email):
+        self._db_session.query(User).filter(User.email == email).update(data)
+        self._db_session.commit()
